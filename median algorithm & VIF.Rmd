@@ -1,0 +1,59 @@
+---
+title: "Median Algorithm"
+output: html_document
+---
+```{r}
+library(dplyr)
+library(purrr)
+```
+
+#import the dataset
+```{r}
+merge = read.csv(file = "~/Documents/Research/ML math finance/merged_data.csv")
+#focus on return
+merge$ret[which(is.nan(merge$ret))] = NA
+merge$ret[which(merge$ret==Inf)] = NA
+missing_column = merge %>%
+  summarise_all(funs(sum(is.na(.))))
+
+percentage_missing = missing_column/nrow(merge)
+
+# keep only columns for which all line are different from 0
+chosen_column = percentage_missing %>% select_if(function(col) all(col <= 0.3))
+
+#get the subset of data with NA no more than 30%
+merge_206 = merge[colnames(merge) %in% colnames(chosen_column)]
+
+data_median_algor = merge_206 %>% 
+   mutate_all(~ifelse(is.na(.), median(., na.rm = TRUE), .))
+```
+
+```{r}
+#add noise
+addNoise <- function(mtx) {
+  if (!is.matrix(mtx)) mtx <- matrix(mtx, byrow = TRUE, nrow = 1)
+  random.stuff <- matrix(runif(prod(dim(mtx)), min = -0.00001, max = 0.0001), nrow = dim(mtx)[1])
+  random.stuff + mtx
+}
+
+data_median_algor = as.matrix(data_median_algor)
+median_noise_data = addNoise(mtx = data_median_algor)
+median_noise_data = as.data.frame(median_noise_data)
+#omit NA and inf
+median_noise_data2 = median_noise_data[Reduce(`&`, lapply(median_noise_data, is.finite)),]	
+median_noise_data3 = select(median_noise_data2, -SINH, -j, -AVGPRICE, -COSH, -ROCP, -SINH, -ROCR100)
+```
+
+```{r}
+#vif approach
+library(car)
+M <- lm(ret~.,data=median_noise_data3)
+
+summary(M)
+
+options(scipen = 200)
+vif(M)
+
+#output the dataset
+write.csv(median_noise_data3, "~/Documents/Research/ML math finance/final_data_median.csv")
+```
